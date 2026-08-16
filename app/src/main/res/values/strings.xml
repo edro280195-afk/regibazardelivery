@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">RegiDelivery</string>
+    <string name="widget_description">Muestra tu siguiente entrega sin abrir la app</string>
+</resources>

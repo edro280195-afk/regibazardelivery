@@ -1,0 +1,419 @@
+package com.example.regibazarapp.data.models
+
+import com.google.gson.annotations.SerializedName
+
+/**
+ * ══════════════════════════════════════════════════
+ *  Regi Bazar – Data Models (mirroring API DTOs)
+ * ══════════════════════════════════════════════════
+ */
+
+// ── Respuesta principal de GET /api/driver/{token} ──
+data class RouteResponse(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String?,
+    @SerializedName("status") val status: String,
+    @SerializedName("startedAt") val startedAt: String?,
+    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto>
+)
+
+// ── Cada entrega dentro de la ruta ──
+data class RouteDeliveryDto(
+    @SerializedName(value = "deliveryId", alternate = ["id"]) val deliveryId: Int,
+    @SerializedName("orderId") val orderId: Int?,
+    @SerializedName("sortOrder") val sortOrder: Int,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName(value = "clientAddress", alternate = ["address"]) val clientAddress: String?,
+    @SerializedName("latitude") val latitude: Double?,
+    @SerializedName("longitude") val longitude: Double?,
+    @SerializedName("status") val status: String,
+    @SerializedName("total") val total: Double,
+    @SerializedName("deliveredAt") val deliveredAt: String?,
+    @SerializedName("notes") val notes: String?,
+    @SerializedName("failureReason") val failureReason: String?,
+    @SerializedName("evidenceUrls") val evidenceUrls: List<String>,
+    @SerializedName("clientPhone") val clientPhone: String?,
+    @SerializedName(value = "paymentMethod", alternate = ["paymentType"]) val paymentMethod: String?,
+    @SerializedName("payments") val payments: List<OrderPaymentDto>?,
+    @SerializedName("items") val items: List<OrderItemDto>?,
+    @SerializedName("amountPaid") val amountPaid: Double,
+    @SerializedName("balanceDue") val balanceDue: Double,
+    @SerializedName("deliveryInstructions") val deliveryInstructions: String?,
+    @SerializedName("arrivedAt") val arrivedAt: String?,
+    @SerializedName("packages") val packages: List<OrderPackageDto>? = null,
+    // ── Etiqueta y tipo de cliente (Feature #5) ──
+    @SerializedName("clientTag") val clientTag: String? = null,
+    @SerializedName("clientType") val clientType: String? = null,
+    @SerializedName("alternativeAddress") val alternativeAddress: String? = null,
+    @SerializedName("kind") val kind: String = "Order",
+    @SerializedName("tandaParticipantId") val tandaParticipantId: String? = null,
+    @SerializedName("tandaId") val tandaId: String? = null,
+    @SerializedName("tandaName") val tandaName: String? = null,
+    @SerializedName("tandaProductName") val tandaProductName: String? = null,
+    @SerializedName("tandaWeek") val tandaWeek: Int? = null,
+    @SerializedName("tandaTotalWeeks") val tandaTotalWeeks: Int? = null,
+    @SerializedName("tandaVariant") val tandaVariant: String? = null
+) {
+    val displayAddress: String?
+        get() = alternativeAddress?.takeIf { it.isNotBlank() }
+            ?: clientAddress?.takeIf { it.isNotBlank() }
+
+    val isTandaDelivery: Boolean
+        get() = kind.equals("Tanda", ignoreCase = true)
+
+    val requiresPayment: Boolean
+        get() = !isTandaDelivery && balanceDue > 0.01
+}
+
+// ── Artículo del pedido ──
+data class OrderItemDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("productName") val productName: String,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("unitPrice") val unitPrice: Double,
+    @SerializedName("lineTotal") val lineTotal: Double
+)
+
+// ── Paquete físico con QR para verificación ──
+data class OrderPackageDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("packageNumber") val packageNumber: Int,
+    @SerializedName("qrCodeValue") val qrCodeValue: String,
+    @SerializedName("status") val status: String,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("loadedAt") val loadedAt: String?,
+    @SerializedName("deliveredAt") val deliveredAt: String?,
+    @SerializedName("returnedAt") val returnedAt: String? = null
+)
+
+// ── Pago registrado ──
+data class OrderPaymentDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("orderId") val orderId: Int,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("method") val method: String,
+    @SerializedName("date") val date: String,
+    @SerializedName("registeredBy") val registeredBy: String,
+    @SerializedName("notes") val notes: String?
+)
+
+// ── Mensaje de chat ──
+data class ChatMessageDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("orderId") val orderId: Int? = null,
+    @SerializedName("deliveryId") val deliveryId: Int? = null,
+    @SerializedName("sender") val sender: String,
+    @SerializedName(value = "text", alternate = ["message"]) val text: String,
+    @SerializedName("timestamp") val timestamp: String
+)
+
+// ── Productos frecuentes (Feature #14) ──
+data class CommonProductDto(
+    @SerializedName("name") val name: String,
+    @SerializedName("count") val count: Int,
+    @SerializedName("typicalPrice") val price: Double
+)
+
+// ── Alerta proactiva de CAMI (Feature #7) ──
+data class CamiAlertDto(
+    @SerializedName("type") val type: String,
+    @SerializedName("message") val message: String,
+    @SerializedName("icon") val icon: String,
+    @SerializedName("relatedId") val relatedId: Int? = null
+)
+
+// ── Respuesta del briefing de ruta (Feature #6) ──
+data class RouteBriefingResponse(
+    @SerializedName("text") val text: String,
+    @SerializedName("audioBase64") val audioBase64: String? = null
+)
+
+// ── Admin Auth ──
+data class AdminLoginRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String
+)
+
+data class AdminLoginResponse(
+    @SerializedName("token") val token: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("expiresAt") val expiresAt: String
+)
+
+// ── Inventario físico / cajas NFC ──
+data class InventoryBoxSummaryDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("location") val location: String?,
+    @SerializedName("isNfcBound") val isNfcBound: Boolean,
+    @SerializedName("articleTypesCount") val articleTypesCount: Int,
+    @SerializedName("totalUnits") val totalUnits: Int,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+data class InventoryItemDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("variant") val variant: String?,
+    @SerializedName("barcode") val barcode: String?,
+    @SerializedName("labelCode") val labelCode: String,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+data class InventoryMovementDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("inventoryItemId") val inventoryItemId: String?,
+    @SerializedName("itemName") val itemName: String?,
+    @SerializedName("type") val type: String,
+    @SerializedName("quantityDelta") val quantityDelta: Int,
+    @SerializedName("quantityAfter") val quantityAfter: Int,
+    @SerializedName("note") val note: String?,
+    @SerializedName("performedBy") val performedBy: String,
+    @SerializedName("occurredAt") val occurredAt: String
+)
+
+data class InventoryBoxDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("location") val location: String?,
+    @SerializedName("isNfcBound") val isNfcBound: Boolean,
+    @SerializedName("nfcUrl") val nfcUrl: String,
+    @SerializedName("items") val items: List<InventoryItemDto>,
+    @SerializedName("movements") val movements: List<InventoryMovementDto>,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("updatedAt") val updatedAt: String
+)
+
+data class CreateInventoryBoxDto(
+    @SerializedName("code") val code: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("location") val location: String?
+)
+
+data class CreateInventoryItemDto(
+    @SerializedName("name") val name: String,
+    @SerializedName("variant") val variant: String?,
+    @SerializedName("barcode") val barcode: String?,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("note") val note: String?
+)
+
+data class AdjustInventoryItemDto(
+    @SerializedName("quantityDelta") val quantityDelta: Int,
+    @SerializedName("note") val note: String?
+)
+
+data class BindInventoryNfcDto(
+    @SerializedName("tagUid") val tagUid: String
+)
+
+data class TransferInventoryItemsDto(
+    @SerializedName("sourceBoxId") val sourceBoxId: String,
+    @SerializedName("destinationBoxId") val destinationBoxId: String,
+    @SerializedName("itemId") val itemId: String,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("note") val note: String?
+)
+
+data class InventoryBarcodeMatchDto(
+    @SerializedName("boxId") val boxId: String,
+    @SerializedName("boxCode") val boxCode: String,
+    @SerializedName("boxName") val boxName: String,
+    @SerializedName("location") val location: String?,
+    @SerializedName("itemId") val itemId: String,
+    @SerializedName("itemName") val itemName: String,
+    @SerializedName("variant") val variant: String?,
+    @SerializedName("barcode") val barcode: String?,
+    @SerializedName("scannableCode") val scannableCode: String,
+    @SerializedName("quantity") val quantity: Int
+)
+
+data class InventoryCountItemDto(
+    @SerializedName("inventoryItemId") val inventoryItemId: String,
+    @SerializedName("actualQuantity") val actualQuantity: Int
+)
+
+data class CompleteInventoryCountDto(
+    @SerializedName("items") val items: List<InventoryCountItemDto>,
+    @SerializedName("note") val note: String?
+)
+
+// ── Lista de Rutas (Admin) ──
+data class RouteListDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("driverToken") val driverToken: String,
+    @SerializedName("driverLink") val driverLink: String?,
+    @SerializedName("status") val status: String,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("startedAt") val startedAt: String?,
+    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto>,
+    @SerializedName("expenses") val expenses: List<DriverExpenseDto> = emptyList()
+) {
+    val deliveredCount: Int get() = deliveries.count { it.status == "Delivered" }
+    val failedCount: Int get() = deliveries.count { it.status == "NotDelivered" }
+    val pendingCount: Int get() = deliveries.count { it.status == "Pending" || it.status == "InTransit" }
+    val totalCount: Int get() = deliveries.size
+    val totalAmount: Double get() = deliveries.sumOf { it.total }
+}
+
+data class DriverExpenseDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("deliveryRouteId") val deliveryRouteId: Int?,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("expenseType") val expenseType: String,
+    @SerializedName("date") val date: String,
+    @SerializedName("notes") val notes: String?,
+    @SerializedName("evidencePath") val evidencePath: String?,
+    @SerializedName("createdAt") val createdAt: String
+)
+
+data class OrderSummaryDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName("status") val status: String,
+    @SerializedName("total") val total: Double,
+    @SerializedName("orderType") val orderType: String,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("link") val link: String = "",
+    @SerializedName("itemsCount") val itemsCount: Int = 0,
+    @SerializedName("type") val type: String = "",
+    @SerializedName("clientPhone") val clientPhone: String? = null,
+    @SerializedName("clientAddress") val clientAddress: String? = null,
+    @SerializedName("alternativeAddress") val alternativeAddress: String? = null,
+    @SerializedName("postponedAt") val postponedAt: String? = null,
+    @SerializedName("postponedNote") val postponedNote: String? = null,
+    @SerializedName("subtotal") val subtotal: Double = 0.0,
+    @SerializedName("shippingCost") val shippingCost: Double = 0.0,
+    @SerializedName("accessToken") val accessToken: String = "",
+    @SerializedName("expiresAt") val expiresAt: String = "",
+    @SerializedName("clientId") val clientId: Int? = null,
+    @SerializedName("clientLatitude") val clientLatitude: Double? = null,
+    @SerializedName("clientLongitude") val clientLongitude: Double? = null,
+    @SerializedName("deliveryInstructions") val deliveryInstructions: String? = null,
+    @SerializedName("deliveryRouteId") val deliveryRouteId: Int? = null,
+    @SerializedName("items") val items: List<OrderItemDto> = emptyList(),
+    @SerializedName("payments") val payments: List<OrderPaymentDto> = emptyList(),
+    @SerializedName("amountPaid") val amountPaid: Double = 0.0,
+    @SerializedName("balanceDue") val balanceDue: Double = 0.0,
+    @SerializedName("advancePayment") val advancePayment: Double = 0.0,
+    @SerializedName("paymentMethod") val paymentMethod: String? = null,
+    @SerializedName("salesPeriodId") val salesPeriodId: Int? = null,
+    @SerializedName("salesPeriodName") val salesPeriodName: String? = null,
+    @SerializedName("tags") val tags: List<String> = emptyList(),
+    @SerializedName("discountAmount") val discountAmount: Double? = null,
+    @SerializedName("scheduledDeliveryDate") val scheduledDeliveryDate: String? = null,
+    @SerializedName("totalPackages") val totalPackages: Int? = null,
+    @SerializedName("packagesConfirmed") val packagesConfirmed: Boolean = false,
+    @SerializedName("clientFacebookProfileUrl") val clientFacebookProfileUrl: String? = null,
+    @SerializedName("notifiedAt") val notifiedAt: String? = null,
+    @SerializedName("clientPoints") val clientPoints: Int? = null
+) {
+    val effectiveAddress: String?
+        get() = alternativeAddress?.takeIf { it.isNotBlank() }
+            ?: clientAddress?.takeIf { it.isNotBlank() }
+
+    val hasCoordinates: Boolean
+        get() = clientLatitude != null && clientLongitude != null
+}
+
+data class AvailableTandaDto(
+    @SerializedName("tandaParticipantId") val tandaParticipantId: String,
+    @SerializedName("tandaId") val tandaId: String,
+    @SerializedName("tandaName") val tandaName: String,
+    @SerializedName("tandaProductName") val tandaProductName: String?,
+    @SerializedName("week") val week: Int,
+    @SerializedName("totalWeeks") val totalWeeks: Int,
+    @SerializedName("variant") val variant: String?,
+    @SerializedName("clientId") val clientId: Int,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName("clientAddress") val clientAddress: String?,
+    @SerializedName("clientPhone") val clientPhone: String?,
+    @SerializedName("clientLatitude") val clientLatitude: Double?,
+    @SerializedName("clientLongitude") val clientLongitude: Double?,
+    @SerializedName("deliveryInstructions") val deliveryInstructions: String?
+) {
+    val hasCoordinates: Boolean
+        get() = clientLatitude != null && clientLongitude != null
+}
+
+data class PreviewStopDto(
+    @SerializedName("kind") val kind: String,
+    @SerializedName("orderId") val orderId: Int?,
+    @SerializedName("tandaParticipantId") val tandaParticipantId: String?,
+    @SerializedName("sortOrder") val sortOrder: Int,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName("clientAddress") val clientAddress: String?,
+    @SerializedName("latitude") val latitude: Double?,
+    @SerializedName("longitude") val longitude: Double?,
+    @SerializedName("total") val total: Double,
+    @SerializedName("hasCoords") val hasCoords: Boolean,
+    @SerializedName("tandaName") val tandaName: String?,
+    @SerializedName("tandaWeek") val tandaWeek: Int?
+)
+
+data class SkippedStopDto(
+    @SerializedName("kind") val kind: String,
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("reason") val reason: String
+)
+
+data class PreviewRouteResponse(
+    @SerializedName("stops") val stops: List<PreviewStopDto>,
+    @SerializedName("totalDistanceMeters") val totalDistanceMeters: Int,
+    @SerializedName("totalDurationSeconds") val totalDurationSeconds: Int,
+    @SerializedName("optimizerSource") val optimizerSource: String,
+    @SerializedName("skipped") val skipped: List<SkippedStopDto>,
+    @SerializedName("stopsWithoutCoords") val stopsWithoutCoords: Int,
+    @SerializedName("polylineEncoded") val polylineEncoded: String? = null,
+    @SerializedName("depotLatitude") val depotLatitude: Double? = null,
+    @SerializedName("depotLongitude") val depotLongitude: Double? = null
+)
+
+data class CreateRouteResponse(
+    @SerializedName("route") val route: RouteListDto,
+    @SerializedName("skipped") val skipped: List<SkippedStopDto>
+)
+
+data class RoutePackageRequirementDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName("totalPackages") val totalPackages: Int? = null
+)
+
+data class RecomposeRouteResponse(
+    @SerializedName("route") val route: RouteListDto,
+    @SerializedName("skipped") val skipped: List<SkippedStopDto>
+)
+
+data class BulkGeocodeResultDto(
+    @SerializedName("clientId") val clientId: Int,
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("latitude") val latitude: Double?,
+    @SerializedName("longitude") val longitude: Double?,
+    @SerializedName("formattedAddress") val formattedAddress: String?,
+    @SerializedName("error") val error: String?
+)
+
+data class ClientDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("phone") val phone: String?,
+    @SerializedName("address") val address: String?,
+    @SerializedName("tag") val tag: String,
+    @SerializedName("ordersCount") val ordersCount: Int,
+    @SerializedName("totalSpent") val totalSpent: Double,
+    @SerializedName("type") val type: String,
+    @SerializedName("deliveryInstructions") val deliveryInstructions: String?,
+    @SerializedName("latitude") val latitude: Double?,
+    @SerializedName("longitude") val longitude: Double?
+)
+
+data class AiRouteSelectionResponse(
+    @SerializedName("selectedOrderIds") val selectedOrderIds: List<Int>,
+    @SerializedName("aiConfirmationMessage") val aiConfirmationMessage: String,
+    @SerializedName("audioBase64") val audioBase64: String? = null
+)
