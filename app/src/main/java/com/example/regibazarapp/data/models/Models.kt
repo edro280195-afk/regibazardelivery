@@ -21,9 +21,12 @@ data class RouteResponse(
     @SerializedName("finalCashActual") val finalCashActual: Double? = null,
     @SerializedName("settlementDifference") val settlementDifference: Double? = null,
     @SerializedName("settledAt") val settledAt: String? = null,
-    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto>,
-    @SerializedName("expenses") val expenses: List<DriverExpenseDto> = emptyList()
-)
+    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto>? = emptyList(),
+    @SerializedName("expenses") val expenses: List<DriverExpenseDto>? = emptyList()
+) {
+    val safeDeliveries: List<RouteDeliveryDto> get() = deliveries.orEmpty()
+    val safeExpenses: List<DriverExpenseDto> get() = expenses.orEmpty()
+}
 
 // ── Cada entrega dentro de la ruta ──
 data class RouteDeliveryDto(
@@ -39,7 +42,7 @@ data class RouteDeliveryDto(
     @SerializedName("deliveredAt") val deliveredAt: String?,
     @SerializedName("notes") val notes: String?,
     @SerializedName("failureReason") val failureReason: String?,
-    @SerializedName("evidenceUrls") val evidenceUrls: List<String>,
+    @SerializedName("evidenceUrls") val evidenceUrls: List<String>? = emptyList(),
     @SerializedName("clientPhone") val clientPhone: String?,
     @SerializedName(value = "paymentMethod", alternate = ["paymentType"]) val paymentMethod: String?,
     @SerializedName("payments") val payments: List<OrderPaymentDto>?,
@@ -261,9 +264,10 @@ data class RouteListDto(
     @SerializedName("status") val status: String,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("startedAt") val startedAt: String?,
-    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto>,
-    @SerializedName("expenses") val expenses: List<DriverExpenseDto> = emptyList()
+    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto> = emptyList(),
+    @SerializedName("expenses") val expenses: List<DriverExpenseDto>? = emptyList()
 ) {
+    val safeExpenses: List<DriverExpenseDto> get() = expenses.orEmpty()
     val deliveredCount: Int get() = deliveries.count { it.status == "Delivered" }
     val failedCount: Int get() = deliveries.count { it.status == "NotDelivered" }
     val pendingCount: Int get() = deliveries.count { it.status == "Pending" || it.status == "InTransit" }
@@ -474,51 +478,80 @@ data class ActiveTandaInfoDto(
 )
 
 data class RouteSettlementOrderPaymentDto(
-    @SerializedName("deliveryId") val deliveryId: Int,
-    @SerializedName("orderId") val orderId: Int?,
-    @SerializedName("clientName") val clientName: String,
-    @SerializedName("amount") val amount: Double,
-    @SerializedName("method") val method: String,
-    @SerializedName("notes") val notes: String?
-)
+    @SerializedName("orderId") val orderId: Int? = null,
+    @SerializedName("deliveryId") val deliveryId: Int? = null,
+    @SerializedName("clientName") val clientName: String? = null,
+    @SerializedName("address") val address: String? = null,
+    @SerializedName("total") val total: Double? = 0.0,
+    @SerializedName("amountPaid", alternate = ["amount"]) val amountPaid: Double? = 0.0,
+    @SerializedName("method") val method: String? = null,
+    @SerializedName("notes") val notes: String? = null,
+    @SerializedName("date") val date: String? = null
+) {
+    val amount: Double get() = amountPaid ?: 0.0
+}
 
 data class RouteSettlementTandaPaymentDto(
-    @SerializedName("id") val id: Int,
-    @SerializedName("clientName") val clientName: String,
-    @SerializedName("tandaName") val tandaName: String?,
-    @SerializedName("weekNumber") val weekNumber: Int,
-    @SerializedName("amount") val amount: Double,
-    @SerializedName("method") val method: String,
-    @SerializedName("isExtraIncome") val isExtraIncome: Boolean,
-    @SerializedName("notes") val notes: String?
+    @SerializedName("paymentId", alternate = ["id"]) val paymentId: String? = null,
+    @SerializedName("clientName") val clientName: String? = null,
+    @SerializedName("tandaName") val tandaName: String? = null,
+    @SerializedName("weekNumber") val weekNumber: Int? = null,
+    @SerializedName("amount") val amount: Double? = 0.0,
+    @SerializedName("method") val method: String? = null,
+    @SerializedName("isExtraIncome") val isExtraIncome: Boolean? = false,
+    @SerializedName("notes") val notes: String? = null,
+    @SerializedName("date") val date: String? = null
 )
 
 data class RouteSettlementDto(
-    @SerializedName("routeId") val routeId: Int,
-    @SerializedName("driverName") val driverName: String?,
-    @SerializedName("startedAt") val startedAt: String?,
-    @SerializedName("settledAt") val settledAt: String?,
-    @SerializedName("isSettled") val isSettled: Boolean,
-    @SerializedName("initialCash") val initialCash: Double,
-    @SerializedName("initialCashBreakdown") val initialCashBreakdown: CashDenominations?,
-    @SerializedName("initialExchangeRate") val initialExchangeRate: Double,
-    @SerializedName("totalOrdersCash") val totalOrdersCash: Double,
-    @SerializedName("totalOrdersTransfer") val totalOrdersTransfer: Double,
-    @SerializedName("totalOrdersCollected") val totalOrdersCollected: Double,
-    @SerializedName("totalTandasCash") val totalTandasCash: Double,
-    @SerializedName("totalTandasTransfer") val totalTandasTransfer: Double,
-    @SerializedName("totalTandasCollected") val totalTandasCollected: Double,
-    @SerializedName("totalExpenses") val totalExpenses: Double,
-    @SerializedName("expectedCashInHand") val expectedCashInHand: Double,
-    @SerializedName("actualCashInHand") val actualCashInHand: Double,
-    @SerializedName("difference") val difference: Double,
-    @SerializedName("finalCashBreakdown") val finalCashBreakdown: CashDenominations?,
-    @SerializedName("settlementNotes") val settlementNotes: String?,
-    @SerializedName("ordersDeliveredCount") val ordersDeliveredCount: Int,
-    @SerializedName("ordersTotalCount") val ordersTotalCount: Int,
-    @SerializedName("orderPayments") val orderPayments: List<RouteSettlementOrderPaymentDto> = emptyList(),
-    @SerializedName("tandaPayments") val tandaPayments: List<RouteSettlementTandaPaymentDto> = emptyList(),
-    @SerializedName("expenses") val expenses: List<DriverExpenseDto> = emptyList(),
-    @SerializedName("whatsAppShareText") val whatsAppShareText: String,
-    @SerializedName("webReportUrl") val webReportUrl: String
-)
+    @SerializedName("routeId") val routeId: Int? = null,
+    @SerializedName("routeName", alternate = ["driverName"]) val routeName: String? = null,
+    @SerializedName("driverToken") val driverToken: String? = null,
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("startedAt") val startedAt: String? = null,
+    @SerializedName("completedAt") val completedAt: String? = null,
+    @SerializedName("settledAt") val settledAt: String? = null,
+    @SerializedName("settlementStatus") val settlementStatus: String? = null,
+    @SerializedName("initialCash") val initialCash: Double? = 0.0,
+    @SerializedName("initialBreakdown", alternate = ["initialCashBreakdown"]) val initialBreakdown: CashDenominations? = null,
+    @SerializedName("initialExchangeRate") val initialExchangeRate: Double? = 18.0,
+    @SerializedName("expectedCash", alternate = ["expectedCashInHand"]) val expectedCash: Double? = 0.0,
+    @SerializedName("actualCash", alternate = ["actualCashInHand"]) val actualCash: Double? = null,
+    @SerializedName("finalBreakdown", alternate = ["finalCashBreakdown"]) val finalBreakdown: CashDenominations? = null,
+    @SerializedName("difference") val difference: Double? = null,
+    @SerializedName("notes", alternate = ["settlementNotes"]) val notes: String? = null,
+    @SerializedName("totalDeliveries", alternate = ["ordersTotalCount"]) val totalDeliveries: Int? = 0,
+    @SerializedName("deliveredCount", alternate = ["ordersDeliveredCount"]) val deliveredCount: Int? = 0,
+    @SerializedName("failedCount") val failedCount: Int? = 0,
+    @SerializedName("orderCashTotal", alternate = ["totalOrdersCash"]) val orderCashTotal: Double? = 0.0,
+    @SerializedName("orderTransferTotal", alternate = ["totalOrdersTransfer"]) val orderTransferTotal: Double? = 0.0,
+    @SerializedName("orderDepositTotal") val orderDepositTotal: Double? = 0.0,
+    @SerializedName("orderTotal", alternate = ["totalOrdersCollected"]) val orderTotal: Double? = 0.0,
+    @SerializedName("tandaCashTotal", alternate = ["totalTandasCash"]) val tandaCashTotal: Double? = 0.0,
+    @SerializedName("tandaTransferTotal", alternate = ["totalTandasTransfer"]) val tandaTransferTotal: Double? = 0.0,
+    @SerializedName("tandaTotal", alternate = ["totalTandasCollected"]) val tandaTotal: Double? = 0.0,
+    @SerializedName("expensesTotal", alternate = ["totalExpenses"]) val expensesTotal: Double? = 0.0,
+    @SerializedName("orderPayments") val orderPayments: List<RouteSettlementOrderPaymentDto>? = emptyList(),
+    @SerializedName("tandaPayments") val tandaPayments: List<RouteSettlementTandaPaymentDto>? = emptyList(),
+    @SerializedName("expenses") val expenses: List<DriverExpenseDto>? = emptyList(),
+    @SerializedName("whatsAppShareText") val whatsAppShareText: String? = null,
+    @SerializedName("webReportUrl") val webReportUrl: String? = null
+) {
+    val isSettled: Boolean
+        get() = settledAt != null || settlementStatus == "Cuadrado" || settlementStatus == "Faltante" || settlementStatus == "Sobrante"
+    val driverName: String? get() = routeName
+    val initialCashBreakdown: CashDenominations? get() = initialBreakdown
+    val finalCashBreakdown: CashDenominations? get() = finalBreakdown
+    val settlementNotes: String? get() = notes
+    val totalOrdersCash: Double get() = orderCashTotal ?: 0.0
+    val totalOrdersTransfer: Double get() = orderTransferTotal ?: 0.0
+    val totalOrdersCollected: Double get() = orderTotal ?: 0.0
+    val totalTandasCash: Double get() = tandaCashTotal ?: 0.0
+    val totalTandasTransfer: Double get() = tandaTransferTotal ?: 0.0
+    val totalTandasCollected: Double get() = tandaTotal ?: 0.0
+    val totalExpenses: Double get() = expensesTotal ?: 0.0
+    val expectedCashInHand: Double get() = expectedCash ?: 0.0
+    val actualCashInHand: Double get() = actualCash ?: 0.0
+    val ordersDeliveredCount: Int get() = deliveredCount ?: 0
+    val ordersTotalCount: Int get() = totalDeliveries ?: 0
+}

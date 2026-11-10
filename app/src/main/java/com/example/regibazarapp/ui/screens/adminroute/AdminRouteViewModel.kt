@@ -394,7 +394,7 @@ class AdminRouteViewModel(application: Application) : AndroidViewModel(applicati
 
     fun moveDelivery(deliveryId: Int, direction: Int) {
         val route = _uiState.value.route ?: return
-        val deliveries = route.deliveries.toMutableList()
+        val deliveries = route.deliveries.orEmpty().toMutableList()
         val currentIndex = deliveries.indexOfFirst { it.deliveryId == deliveryId }
         val targetIndex = currentIndex + direction
         if (currentIndex < 0 || targetIndex !in deliveries.indices) return
@@ -405,7 +405,7 @@ class AdminRouteViewModel(application: Application) : AndroidViewModel(applicati
             delivery.copy(sortOrder = index + 1)
         }
 
-        _uiState.update { it.copy(route = route.copy(deliveries = reordered), isWorking = true) }
+        _uiState.update { it.copy(route = route.copy(deliveries = reordered, expenses = route.expenses.orEmpty()), isWorking = true) }
         viewModelScope.launch {
             when (
                 val result = repository.reorderRoute(

@@ -213,10 +213,14 @@ class RouteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun processRouteData(route: RouteResponse) {
-        val orderedDeliveries = route.deliveries
+        val rawDeliveries = route.deliveries.orEmpty()
+        val orderedDeliveries = rawDeliveries
             .sortedWith(compareBy<RouteDeliveryDto> { it.sortOrder }.thenBy { it.deliveryId })
-        val normalizedRoute = route.copy(deliveries = orderedDeliveries)
-        val deliveries = normalizedRoute.deliveries
+        val normalizedRoute = route.copy(
+            deliveries = orderedDeliveries,
+            expenses = route.expenses.orEmpty()
+        )
+        val deliveries = normalizedRoute.deliveries.orEmpty()
         val delivered = deliveries.count { it.status == "Delivered" }
         val failed = deliveries.count { it.status == "NotDelivered" }
         val current = nextRouteDelivery(deliveries)
@@ -454,7 +458,7 @@ class RouteViewModel(application: Application) : AndroidViewModel(application) {
             val originLat = LocationForegroundService.lastLat
             val originLng = LocationForegroundService.lastLng
 
-            val pendingDeliveries = routeData.deliveries
+            val pendingDeliveries = routeData.deliveries.orEmpty()
                 .filter { (it.status == "Pending" || it.status == "InTransit") && it.latitude != null && it.longitude != null }
                 .sortedBy { it.sortOrder }
 
@@ -1115,7 +1119,7 @@ class RouteViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val currentRoute = _uiState.value.routeData
                 if (currentRoute != null && orderedDeliveryIds.isNotEmpty()) {
-                    val reorderedDeliveries = currentRoute.deliveries.map { delivery ->
+                    val reorderedDeliveries = currentRoute.deliveries.orEmpty().map { delivery ->
                         val newPos = orderedDeliveryIds.indexOf(delivery.deliveryId)
                         if (newPos != -1) {
                             delivery.copy(sortOrder = newPos + 1)
@@ -1127,7 +1131,10 @@ class RouteViewModel(application: Application) : AndroidViewModel(application) {
                     val newCurrent = reorderedDeliveries.firstOrNull { it.status == "Pending" || it.status == "InTransit" }
                     _uiState.update { state ->
                         state.copy(
-                            routeData = currentRoute.copy(deliveries = reorderedDeliveries),
+                            routeData = currentRoute.copy(
+                                deliveries = reorderedDeliveries,
+                                expenses = currentRoute.expenses.orEmpty()
+                            ),
                             currentDelivery = newCurrent ?: state.currentDelivery
                         )
                     }

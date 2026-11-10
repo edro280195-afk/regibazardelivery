@@ -152,7 +152,7 @@ class RouteSummaryViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private fun processRoute(route: RouteResponse) {
-        val deliveries = route.deliveries
+        val deliveries = route.deliveries.orEmpty()
         val delivered = deliveries.count { it.status.equals("Delivered", ignoreCase = true) }
         val failed = deliveries.count { it.status.equals("NotDelivered", ignoreCase = true) }
         val payments = deliveries
@@ -198,7 +198,7 @@ class RouteSummaryViewModel(application: Application) : AndroidViewModel(applica
                 fastestDoorTimeSecs = doorTimeSecs.minOrNull(),
                 slowestDoorTimeSecs = doorTimeSecs.maxOrNull(),
                 initialCash = route.initialCash ?: 0.0,
-                totalExpenses = route.expenses.sumOf { it.amount }
+                totalExpenses = route.expenses.orEmpty().sumOf { it.amount }
             )
         }
     }
