@@ -491,6 +491,25 @@ class AdminRouteViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.update { it.copy(error = null, message = null) }
     }
 
+    fun startRoute(request: com.example.regibazarapp.data.models.StartRouteRequest? = null) {
+        val token = _uiState.value.route?.driverToken ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isWorking = true, error = null, message = null) }
+            try {
+                val response = com.example.regibazarapp.data.network.NetworkModule.api.startRoute(token, request)
+                if (response.isSuccessful) {
+                    SyncManager.triggerRefresh()
+                    _uiState.update { it.copy(isWorking = false, message = "Ruta iniciada con caja chica.") }
+                    loadRoute(showLoading = false)
+                } else {
+                    _uiState.update { it.copy(isWorking = false, error = "No se pudo iniciar: HTTP ${response.code()}") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isWorking = false, error = e.message ?: "Error al iniciar") }
+            }
+        }
+    }
+
     private fun performMutation(
         successMessage: String,
         block: suspend (Int) -> RepositoryResult<Unit>

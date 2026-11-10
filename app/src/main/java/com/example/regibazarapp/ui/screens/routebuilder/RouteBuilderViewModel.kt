@@ -493,7 +493,13 @@ class RouteBuilderViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun saveRoute() {
+    private var pendingFundRequest: com.example.regibazarapp.data.models.StartRouteRequest? = null
+
+    fun saveRoute(initialFundRequest: com.example.regibazarapp.data.models.StartRouteRequest? = null) {
+        if (initialFundRequest != null) {
+            pendingFundRequest = initialFundRequest
+        }
+        val fundReq = initialFundRequest ?: pendingFundRequest
         val state = _uiState.value
         if (state.selectedCount == 0 || state.isSaving) return
 
@@ -527,8 +533,11 @@ class RouteBuilderViewModel(application: Application) : AndroidViewModel(applica
             } else {
                 when (
                     val createResult = repository.createRoute(
-                        state.selectedOrderIds.toList(),
-                        state.selectedTandaIds.toList()
+                        orderIds = state.selectedOrderIds.toList(),
+                        tandaParticipantIds = state.selectedTandaIds.toList(),
+                        initialCash = fundReq?.initialCash ?: fundReq?.breakdown?.totalInMxn,
+                        initialBreakdown = fundReq?.breakdown,
+                        initialExchangeRate = fundReq?.exchangeRate ?: fundReq?.breakdown?.exchangeRate
                     )
                 ) {
                     is RepositoryResult.Success -> {
@@ -597,7 +606,7 @@ class RouteBuilderViewModel(application: Application) : AndroidViewModel(applica
                     message = "Bolsas confirmadas. Ya puedes crear la ruta."
                 )
             }
-            saveRoute()
+            saveRoute(pendingFundRequest)
         }
     }
 

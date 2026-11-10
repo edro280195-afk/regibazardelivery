@@ -679,7 +679,7 @@ fun RouteScreen(
             onRecordTandaPayment = { req ->
                 routeViewModel.recordTandaPayment(req) { success, msg ->
                     if (success) {
-                        android.widget.Toast.makeText(context, "🌸 ¡Pago de tanda registrado con éxito!", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, "\uD83C\uDF38 ¡Pago de tanda registrado con éxito!", android.widget.Toast.LENGTH_SHORT).show()
                     } else {
                         android.widget.Toast.makeText(context, "Error al registrar tanda: ${msg ?: ""}", android.widget.Toast.LENGTH_SHORT).show()
                     }
@@ -726,7 +726,7 @@ fun RouteScreen(
                 onRecordTandaPayment = { req ->
                     routeViewModel.recordTandaPayment(req) { success, msg ->
                         if (success) {
-                            android.widget.Toast.makeText(context, "ðŸŒ¸ Â¡Pago de tanda registrado con Ã©xito!", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, "\uD83C\uDF38 ¡Pago de tanda registrado con éxito!", android.widget.Toast.LENGTH_SHORT).show()
                         } else {
                             android.widget.Toast.makeText(context, "Error al registrar tanda: ${msg ?: ""}", android.widget.Toast.LENGTH_SHORT).show()
                         }
@@ -735,7 +735,8 @@ fun RouteScreen(
                 onDeliverWithoutPayment = { reason ->
                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                     routeViewModel.deliverCurrentWithoutPayment(reason)
-                }
+                },
+                exchangeRate = uiState.routeData?.dailyExchangeRate ?: 18.0
             )
         },
         containerColor = DarkBackground
@@ -1200,7 +1201,7 @@ fun RouteScreen(
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "âš ï¸ Pedido actualizado por admin",
+                            "\u26A0\uFE0F Pedido actualizado por admin",
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                             color = InkOnAccent
                         )
@@ -1365,7 +1366,7 @@ private fun CamiOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("âœ¦ C.A.M.I.", style = MaterialTheme.typography.labelLarge, color = BrandAccent, fontWeight = FontWeight.Black)
+                    Text("\u2728 C.A.M.I.", style = MaterialTheme.typography.labelLarge, color = BrandAccent, fontWeight = FontWeight.Black)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         when (camiState) {

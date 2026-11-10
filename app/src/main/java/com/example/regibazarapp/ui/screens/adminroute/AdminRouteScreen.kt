@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,12 +40,14 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -110,6 +113,21 @@ fun AdminRouteScreen(
     val palette = regiBazar2026Palette()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+
+    var showStartFundDialog by remember { mutableStateOf(false) }
+
+    if (showStartFundDialog) {
+        val initialRate = uiState.route?.dailyExchangeRate ?: uiState.route?.initialExchangeRate ?: 18.0
+        com.example.regibazarapp.ui.components.StartRouteFundDialog(
+            initialExchangeRate = initialRate,
+            onDismiss = { showStartFundDialog = false },
+            onConfirmStart = { req ->
+                showStartFundDialog = false
+                viewModel.startRoute(req)
+            }
+        )
+    }
+
     val labelOutput = remember(context) { LabelOutputController(context) }
     var removeCandidate by remember { mutableStateOf<RouteDeliveryDto?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -225,6 +243,7 @@ fun AdminRouteScreen(
                                 palette = palette,
                                 onOptimize = viewModel::optimize,
                                 onEdit = { onEdit(route.id) },
+                                onStartRouteFund = { showStartFundDialog = true },
                                 onOpenDriver = { onOpenDriver(route.driverToken) },
                                 onShare = { shareRoute(context, route) },
                                 onMoveUp = { deliveryId ->
@@ -431,6 +450,7 @@ private fun AdminRouteContent(
     palette: RegiBazar2026Palette,
     onOptimize: () -> Unit,
     onEdit: () -> Unit,
+    onStartRouteFund: () -> Unit = {},
     onOpenDriver: () -> Unit,
     onShare: () -> Unit,
     onMoveUp: (Int) -> Unit,
@@ -490,6 +510,9 @@ private fun AdminRouteContent(
                 palette = palette,
                 onOptimize = onOptimize,
                 onEdit = onEdit,
+                routeStatus = route.status,
+                initialCash = route.initialCash ?: 0.0,
+                onStartRouteFund = onStartRouteFund,
                 onOpenDriver = onOpenDriver
             )
         }
@@ -713,6 +736,9 @@ private fun AdminRouteActions(
     palette: RegiBazar2026Palette,
     onOptimize: () -> Unit,
     onEdit: () -> Unit,
+    routeStatus: String = "Pending",
+    initialCash: Double = 0.0,
+    onStartRouteFund: () -> Unit = {},
     onOpenDriver: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -756,6 +782,42 @@ private fun AdminRouteActions(
                 Icon(Icons.Rounded.Edit, contentDescription = null)
                 Spacer(Modifier.width(7.dp))
                 Text("Armar", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (routeStatus.equals("Pending", ignoreCase = true)) {
+            Button(
+                onClick = onStartRouteFund,
+                enabled = enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF059669),
+                    contentColor = Color.White
+                )
+            ) {
+                Icon(Icons.Rounded.Payments, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Iniciar ruta con caja chica", fontWeight = FontWeight.Bold)
+            }
+        } else if (routeStatus.equals("Active", ignoreCase = true)) {
+            OutlinedButton(
+                onClick = onStartRouteFund,
+                enabled = enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = palette.accent
+                ),
+                border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Rounded.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Ajustar caja chica ($" + initialCash.toInt() + ")", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 

@@ -95,12 +95,18 @@ class AdminRoutesRepository(
 
     suspend fun createRoute(
         orderIds: List<Int>,
-        tandaParticipantIds: List<String>
+        tandaParticipantIds: List<String>,
+        initialCash: Double? = null,
+        initialBreakdown: com.example.regibazarapp.data.models.CashDenominations? = null,
+        initialExchangeRate: Double? = null
     ): RepositoryResult<CreateRouteResponse> = request {
         api.createRoute(
             CreateRouteRequest(
                 orderIds = orderIds,
-                tandaParticipantIds = tandaParticipantIds
+                tandaParticipantIds = tandaParticipantIds,
+                initialCash = initialCash,
+                initialBreakdown = initialBreakdown,
+                initialExchangeRate = initialExchangeRate
             )
         )
     }

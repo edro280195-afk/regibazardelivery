@@ -242,13 +242,34 @@ fun RouteBuilderScreen(
         )
     }
 
+    var showStartFundDialog by remember { mutableStateOf(false) }
+
+    if (showStartFundDialog) {
+        com.example.regibazarapp.ui.components.StartRouteFundDialog(
+            initialExchangeRate = 18.0,
+            onDismiss = {
+                showStartFundDialog = false
+                viewModel.saveRoute(null)
+            },
+            onConfirmStart = { req ->
+                showStartFundDialog = false
+                viewModel.saveRoute(req)
+            }
+        )
+    }
+
     if (uiState.packageRequirements.isNotEmpty()) {
         PackageRequirementsDialog(
             requirements = uiState.packageRequirements,
             isSaving = uiState.isSavingPackages,
             palette = palette,
             onDismiss = viewModel::dismissPackageRequirements,
-            onConfirm = viewModel::confirmPackageRequirements
+            onConfirm = { counts ->
+                viewModel.confirmPackageRequirements(counts)
+                if (routeId == null) {
+                    showStartFundDialog = true
+                }
+            }
         )
     }
 
@@ -273,7 +294,13 @@ fun RouteBuilderScreen(
                     isSaving = uiState.isSaving || uiState.isSavingPackages,
                     palette = palette,
                     onPreview = viewModel::previewRoute,
-                    onSave = viewModel::saveRoute
+                    onSave = {
+                        if (routeId == null) {
+                            showStartFundDialog = true
+                        } else {
+                            viewModel.saveRoute()
+                        }
+                    }
                 )
             }
         },

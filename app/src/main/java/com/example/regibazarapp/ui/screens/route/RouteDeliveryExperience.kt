@@ -155,7 +155,8 @@ fun RouteDeliveryExperience(
                 onScanCompleted = onScanCompleted,
                 onExpense = onExpense,
                 onRecordTandaPayment = onRecordTandaPayment,
-                onDeliverWithoutPayment = onDeliverWithoutPayment
+                onDeliverWithoutPayment = onDeliverWithoutPayment,
+                exchangeRate = uiState.routeData?.dailyExchangeRate ?: 18.0
             )
         },
         containerColor = palette.background

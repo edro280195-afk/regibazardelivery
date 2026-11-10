@@ -64,7 +64,10 @@ data class CreateRouteRequest(
     @SerializedName("orderIds") val orderIds: List<Int>,
     @SerializedName("force") val force: Boolean = false,
     @SerializedName("tandaParticipantIds") val tandaParticipantIds: List<String> = emptyList(),
-    @SerializedName("preOptimized") val preOptimized: Boolean = false
+    @SerializedName("preOptimized") val preOptimized: Boolean = false,
+    @SerializedName("initialCash") val initialCash: Double? = null,
+    @SerializedName("initialBreakdown") val initialBreakdown: CashDenominations? = null,
+    @SerializedName("initialExchangeRate") val initialExchangeRate: Double? = null
 )
 
 data class SetPackagesRequest(

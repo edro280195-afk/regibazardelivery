@@ -85,6 +85,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -123,7 +124,8 @@ private data class PaymentEntryUi(
     val amount: String,
     val method: String,
     val cashReceived: String = "",
-    val notes: String = ""
+    val notes: String = "",
+    val billBreakdownSummary: String = ""
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -147,6 +149,7 @@ fun DeliveryBottomSheetContent(
     onExpense: () -> Unit = {},
     onRecordTandaPayment: ((com.example.regibazarapp.data.models.DriverTandaPaymentRequest) -> Unit)? = null,
     onDeliverWithoutPayment: ((String) -> Unit)? = null,
+    exchangeRate: Double = 18.0,
     modifier: Modifier = Modifier
 ) {
     val palette = regiBazar2026Palette()
@@ -190,7 +193,10 @@ fun DeliveryBottomSheetContent(
             val cashR = entry.cashReceived.toDoubleOrNull()
             val change = if (cashR != null && entry.method == "Efectivo") (cashR - amount).coerceAtLeast(0.0) else null
             val note = when {
-                cashR != null && change != null -> "RecibiÃ³: {cashR.toInt()} | Cambio: {change.toInt()}"
+                cashR != null && change != null && entry.billBreakdownSummary.isNotBlank() ->
+                    "Recibió: $" + cashR.toInt() + " (" + entry.billBreakdownSummary + ") | Cambio: $" + change.toInt()
+                cashR != null && change != null ->
+                    "Recibió: $" + cashR.toInt() + " | Cambio: $" + change.toInt()
                 entry.notes.isNotBlank() -> entry.notes
                 else -> null
             }
@@ -399,7 +405,7 @@ fun DeliveryBottomSheetContent(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("ðŸŒ¸", fontSize = 16.sp)
+                            Text("\uD83C\uDF38", fontSize = 16.sp)
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 "CLIENTA EN TANDA ACTIVA",
@@ -423,7 +429,7 @@ fun DeliveryBottomSheetContent(
                                         color = palette.textPrimary
                                     )
                                     Text(
-                                        "Semana / Â· Cuota: {tanda.weeklyPayment.toInt()}",
+                                        "Semana " + tanda.nextPendingWeek + "/" + tanda.totalWeeks + " · Cuota: $" + tanda.weeklyAmount.toInt(),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = palette.textSecondary
                                     )
@@ -449,6 +455,7 @@ fun DeliveryBottomSheetContent(
                 PaymentEditor(
                     entries = paymentEntries,
                     balanceDue = delivery.balanceDue,
+                    exchangeRate = exchangeRate,
                     palette = palette
                 )
             }
@@ -531,7 +538,7 @@ fun DeliveryBottomSheetContent(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "âš ï¸ Entregar sin recibir pago (Fiar)",
+                        text = "Entregar sin recibir pago (Fiar)",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color(0xFFE11D48)
                     )
@@ -623,7 +630,7 @@ fun DeliveryBottomSheetContent(
             onDismissRequest = { showUnpaidDeliveryDialog = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("âš ï¸", fontSize = 20.sp)
+                    Text("\u26A0\uFE0F", fontSize = 20.sp)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "Entregar sin recibir pago",
@@ -635,14 +642,14 @@ fun DeliveryBottomSheetContent(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Se registrarÃ¡ la entrega y se notificarÃ¡ inmediatamente a la dueÃ±a de Regi Bazar que el pedido queda con saldo pendiente.",
+                        text = "Se registrará la entrega y se notificará inmediatamente a la dueña de Regi Bazar que el pedido queda con saldo pendiente.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = unpaidReasonText,
                         onValueChange = { unpaidReasonText = it },
-                        label = { Text("Motivo / ObservaciÃ³n (Ej. Paga por transf. despuÃ©s)") },
+                        label = { Text("Motivo / Observación (Ej. Paga por transf. después)") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         singleLine = false,
@@ -907,6 +914,7 @@ private fun PackageVerificationRow(
 private fun PaymentEditor(
     entries: MutableList<PaymentEntryUi>,
     balanceDue: Double,
+    exchangeRate: Double,
     palette: RegiBazar2026Palette
 ) {
     val totalEntered = entries.sumOf { it.amount.toDoubleOrNull() ?: 0.0 }
@@ -947,6 +955,7 @@ private fun PaymentEditor(
         entries.forEachIndexed { index, entry ->
             PaymentEntry(
                 entry = entry,
+                exchangeRate = exchangeRate,
                 palette = palette,
                 canRemove = entries.size > 1,
                 onEntryChange = { entries[index] = it },
@@ -982,12 +991,15 @@ private fun PaymentEditor(
 @Composable
 private fun PaymentEntry(
     entry: PaymentEntryUi,
+    exchangeRate: Double,
     palette: RegiBazar2026Palette,
     canRemove: Boolean,
     onEntryChange: (PaymentEntryUi) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier
 ) {
+    var currencyTab by remember { mutableIntStateOf(0) } // 0: MXN, 1: USD
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1001,7 +1013,7 @@ private fun PaymentEntry(
                     onEntryChange(entry.copy(amount = value.filter { it.isDigit() || it == '.' }))
                 },
                 modifier = Modifier.weight(1f),
-                prefix = { Text("$") },
+                prefix = { Text("$", fontWeight = FontWeight.Bold) },
                 label = { Text("Monto") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -1074,60 +1086,229 @@ private fun PaymentEntry(
                 }
             }
         }
+
         if (entry.method == "Efectivo") {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Â¿Con cuÃ¡nto paga la clienta?",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = palette.textSecondary
-            )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(10.dp))
+
+            // Selector MXN / USD y Tipo de Cambio
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf(50, 100, 200, 500, 1000).forEach { denom ->
+                Text(
+                    "¿Con cuánto paga la clienta?",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = palette.textPrimary
+                )
+
+                Row(
+                    modifier = Modifier
+                        .background(palette.surface, RoundedCornerShape(10.dp))
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     Surface(
-                        onClick = { onEntryChange(entry.copy(cashReceived = denom.toString())) },
+                        onClick = { currencyTab = 0 },
                         shape = RoundedCornerShape(8.dp),
-                        color = if (entry.cashReceived == denom.toString()) palette.accent else palette.surface,
-                        contentColor = if (entry.cashReceived == denom.toString()) Color.White else palette.accent,
-                        border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.5f)),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(30.dp)
+                        color = if (currencyTab == 0) palette.accent else Color.Transparent,
+                        contentColor = if (currencyTab == 0) Color.White else palette.textSecondary
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("$", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
+                        Text(
+                            "MXN $",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Surface(
+                        onClick = { currencyTab = 1 },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (currencyTab == 1) palette.accent else Color.Transparent,
+                        contentColor = if (currencyTab == 1) Color.White else palette.textSecondary
+                    ) {
+                        Text(
+                            "USD $",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-                Surface(
-                    onClick = { onEntryChange(entry.copy(cashReceived = entry.amount)) },
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (entry.cashReceived == entry.amount && entry.amount.isNotBlank()) palette.accent else palette.surface,
-                    contentColor = if (entry.cashReceived == entry.amount && entry.amount.isNotBlank()) Color.White else palette.accent,
-                    border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.5f)),
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .height(30.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("Exacto", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+
+            if (currencyTab == 1) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Tipo de cambio: $" + exchangeRate.toInt() + " MXN por cada dólar",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = palette.accent
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Botones de billetes que SUMAN / ACUMULAN al presionar
+            val denominations = if (currencyTab == 0) {
+                listOf(20, 50, 100, 200, 500, 1000)
+            } else {
+                listOf(1, 5, 10, 20, 50, 100)
+            }
+
+            // Fila 1: Primeros 3 billetes
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                denominations.take(3).forEach { denom ->
+                    val label = if (currencyTab == 0) "+$" + denom else "+$" + denom + " U"
+                    OutlinedButton(
+                        onClick = {
+                            val current = entry.cashReceived.toDoubleOrNull() ?: 0.0
+                            val addVal = if (currencyTab == 0) denom.toDouble() else (denom * exchangeRate)
+                            val updated = (current + addVal).toInt().toString()
+                            val tag = if (currencyTab == 0) "+$" + denom else "+$" + denom + " USD"
+                            val nextSummary = if (entry.billBreakdownSummary.isBlank()) tag else entry.billBreakdownSummary + ", " + tag
+                            onEntryChange(entry.copy(cashReceived = updated, billBreakdownSummary = nextSummary))
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = palette.surface,
+                            contentColor = palette.textPrimary
+                        ),
+                        border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
             }
 
             Spacer(Modifier.height(6.dp))
+
+            // Fila 2: Siguientes 3 billetes
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                denominations.drop(3).forEach { denom ->
+                    val label = if (currencyTab == 0) {
+                        if (denom >= 1000) "+$1,000" else "+$" + denom
+                    } else {
+                        "+$" + denom + " U"
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val current = entry.cashReceived.toDoubleOrNull() ?: 0.0
+                            val addVal = if (currencyTab == 0) denom.toDouble() else (denom * exchangeRate)
+                            val updated = (current + addVal).toInt().toString()
+                            val tag = if (currencyTab == 0) (if (denom >= 1000) "+$1,000" else "+$" + denom) else "+$" + denom + " USD"
+                            val nextSummary = if (entry.billBreakdownSummary.isBlank()) tag else entry.billBreakdownSummary + ", " + tag
+                            onEntryChange(entry.copy(cashReceived = updated, billBreakdownSummary = nextSummary))
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = palette.surface,
+                            contentColor = palette.textPrimary
+                        ),
+                        border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            // Fila de acciones: "Cobro Exacto" y "Borrar"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Button(
+                    onClick = {
+                        onEntryChange(entry.copy(cashReceived = entry.amount, billBreakdownSummary = "Exacto"))
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp),
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = palette.accentSoft,
+                        contentColor = palette.accent
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text("Pago exacto ($" + entry.amount + ")", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        onEntryChange(entry.copy(cashReceived = "", billBreakdownSummary = ""))
+                    },
+                    modifier = Modifier.height(34.dp),
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = palette.textSecondary
+                    ),
+                    border = BorderStroke(1.dp, palette.divider),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                ) {
+                    Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("Borrar (0)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Resumen de billetes ingresados si hay varios taps
+            if (entry.billBreakdownSummary.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = palette.surface,
+                    border = BorderStroke(1.dp, palette.divider),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Billetes: " + entry.billBreakdownSummary,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = palette.textSecondary,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2
+                        )
+                        IconButton(
+                            onClick = { onEntryChange(entry.copy(billBreakdownSummary = "", cashReceived = "")) },
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(12.dp), tint = palette.textSecondary)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Campo numérico editable
             OutlinedTextField(
                 value = entry.cashReceived,
                 onValueChange = { value ->
                     onEntryChange(entry.copy(cashReceived = value.filter { it.isDigit() || it == '.' }))
                 },
                 modifier = Modifier.fillMaxWidth(),
-                prefix = { Text("$") },
+                prefix = { Text("$", fontWeight = FontWeight.Bold) },
                 label = { Text("Efectivo recibido de la clienta") },
-                placeholder = { Text("Ej. 500") },
+                placeholder = { Text("Ej. 550") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 shape = RoundedCornerShape(12.dp),
@@ -1147,31 +1328,35 @@ private fun PaymentEntry(
             val receivedVal = entry.cashReceived.toDoubleOrNull()
             if (receivedVal != null && amountVal > 0) {
                 val change = receivedVal - amountVal
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 if (change >= 0) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = Color(0xFFE8F5E9),
                         border = BorderStroke(1.5.dp, Color(0xFF2E7D32)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("ðŸ’µ", fontSize = 22.sp)
-                            Spacer(Modifier.width(8.dp))
+                            Text("\uD83D\uDCB5", fontSize = 24.sp)
+                            Spacer(Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     "DAR DE CAMBIO:",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 10.sp),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 11.sp,
+                                        letterSpacing = 0.5.sp
+                                    ),
                                     color = Color(0xFF1B5E20)
                                 )
                                 Text(
-                                    text = if (change == 0.0) "Cobro Exacto (Sin cambio)" else formatRouteMoney(change),
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 18.sp
+                                    text = if (change == 0.0) "Cobro exacto (Sin cambio)" else formatRouteMoney(change),
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 20.sp
                                     ),
                                     color = Color(0xFF1B5E20)
                                 )
@@ -1180,19 +1365,19 @@ private fun PaymentEntry(
                     }
                 } else {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = Color(0xFFFFEBEE),
                         border = BorderStroke(1.dp, Color(0xFFC62828)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("âš ï¸", fontSize = 16.sp)
-                            Spacer(Modifier.width(6.dp))
+                            Text("\u26A0\uFE0F", fontSize = 18.sp)
+                            Spacer(Modifier.width(8.dp))
                             Text(
-                                "Faltan  para cubrir el monto",
+                                "Faltan " + formatRouteMoney(-change) + " para cubrir el monto",
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                                 color = Color(0xFFC62828)
                             )
@@ -1203,6 +1388,7 @@ private fun PaymentEntry(
         }
     }
 }
+
 @Composable
 private fun DeliveryDetails(
     delivery: RouteDeliveryDto,

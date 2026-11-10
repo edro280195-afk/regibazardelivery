@@ -265,7 +265,10 @@ data class RouteListDto(
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("startedAt") val startedAt: String?,
     @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto> = emptyList(),
-    @SerializedName("expenses") val expenses: List<DriverExpenseDto>? = emptyList()
+    @SerializedName("expenses") val expenses: List<DriverExpenseDto>? = emptyList(),
+    @SerializedName("initialCash") val initialCash: Double? = null,
+    @SerializedName("initialExchangeRate") val initialExchangeRate: Double? = null,
+    @SerializedName("dailyExchangeRate") val dailyExchangeRate: Double? = null
 ) {
     val safeExpenses: List<DriverExpenseDto> get() = expenses.orEmpty()
     val deliveredCount: Int get() = deliveries.count { it.status == "Delivered" }
