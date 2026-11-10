@@ -145,7 +145,10 @@ fun RouteCashSettlementCard(
     }
 
     fun openWebReport() {
-        val webUrl = settlement?.webReportUrl ?: "https://regibazar.com/repartidor/$token/corte"
+        val rawUrl = settlement?.webReportUrl ?: "https://regibazar.com/repartidor/$token/corte"
+        val webUrl = rawUrl
+            .replace("http://regibazarapi.onrender.com", "https://regibazar.com")
+            .replace("https://regibazarapi.onrender.com", "https://regibazar.com")
         try {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(webUrl))
             context.startActivity(intent)
