@@ -14,7 +14,15 @@ data class RouteResponse(
     @SerializedName("name") val name: String?,
     @SerializedName("status") val status: String,
     @SerializedName("startedAt") val startedAt: String?,
-    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto>
+    @SerializedName("initialCash") val initialCash: Double? = null,
+    @SerializedName("initialExchangeRate") val initialExchangeRate: Double? = null,
+    @SerializedName("dailyExchangeRate") val dailyExchangeRate: Double? = null,
+    @SerializedName("exchangeRateUpdatedAt") val exchangeRateUpdatedAt: String? = null,
+    @SerializedName("finalCashActual") val finalCashActual: Double? = null,
+    @SerializedName("settlementDifference") val settlementDifference: Double? = null,
+    @SerializedName("settledAt") val settledAt: String? = null,
+    @SerializedName("deliveries") val deliveries: List<RouteDeliveryDto>,
+    @SerializedName("expenses") val expenses: List<DriverExpenseDto> = emptyList()
 )
 
 // ── Cada entrega dentro de la ruta ──
@@ -52,7 +60,11 @@ data class RouteDeliveryDto(
     @SerializedName("tandaProductName") val tandaProductName: String? = null,
     @SerializedName("tandaWeek") val tandaWeek: Int? = null,
     @SerializedName("tandaTotalWeeks") val tandaTotalWeeks: Int? = null,
-    @SerializedName("tandaVariant") val tandaVariant: String? = null
+    @SerializedName("tandaVariant") val tandaVariant: String? = null,
+    @SerializedName("clientId") val clientId: Int? = null,
+    @SerializedName("activeTandas") val activeTandas: List<ActiveTandaInfoDto>? = null,
+    @SerializedName("deliveredWithoutPayment") val deliveredWithoutPayment: Boolean = false,
+    @SerializedName("unpaidReason") val unpaidReason: String? = null
 ) {
     val displayAddress: String?
         get() = alternativeAddress?.takeIf { it.isNotBlank() }
@@ -309,7 +321,10 @@ data class OrderSummaryDto(
     @SerializedName("packagesConfirmed") val packagesConfirmed: Boolean = false,
     @SerializedName("clientFacebookProfileUrl") val clientFacebookProfileUrl: String? = null,
     @SerializedName("notifiedAt") val notifiedAt: String? = null,
-    @SerializedName("clientPoints") val clientPoints: Int? = null
+    @SerializedName("clientPoints") val clientPoints: Int? = null,
+    @SerializedName("deliveredWithoutPayment") val deliveredWithoutPayment: Boolean = false,
+    @SerializedName("unpaidDeliveryReason") val unpaidDeliveryReason: String? = null,
+    @SerializedName("deliveredWithoutPaymentAt") val deliveredWithoutPaymentAt: String? = null
 ) {
     val effectiveAddress: String?
         get() = alternativeAddress?.takeIf { it.isNotBlank() }
@@ -416,4 +431,94 @@ data class AiRouteSelectionResponse(
     @SerializedName("selectedOrderIds") val selectedOrderIds: List<Int>,
     @SerializedName("aiConfirmationMessage") val aiConfirmationMessage: String,
     @SerializedName("audioBase64") val audioBase64: String? = null
+)
+
+// ── Desglose de billetes y efectivo (MXN y USD) ──
+data class CashDenominations(
+    @SerializedName("mxn20") var mxn20: Int = 0,
+    @SerializedName("mxn50") var mxn50: Int = 0,
+    @SerializedName("mxn100") var mxn100: Int = 0,
+    @SerializedName("mxn200") var mxn200: Int = 0,
+    @SerializedName("mxn500") var mxn500: Int = 0,
+    @SerializedName("mxn1000") var mxn1000: Int = 0,
+    @SerializedName("mxnCoins") var mxnCoins: Double = 0.0,
+    @SerializedName("usd1") var usd1: Int = 0,
+    @SerializedName("usd5") var usd5: Int = 0,
+    @SerializedName("usd10") var usd10: Int = 0,
+    @SerializedName("usd20") var usd20: Int = 0,
+    @SerializedName("usd50") var usd50: Int = 0,
+    @SerializedName("usd100") var usd100: Int = 0,
+    @SerializedName("exchangeRate") var exchangeRate: Double = 18.0
+) {
+    val totalMxn: Double
+        get() = (mxn20 * 20.0) + (mxn50 * 50.0) + (mxn100 * 100.0) +
+                (mxn200 * 200.0) + (mxn500 * 500.0) + (mxn1000 * 1000.0) + mxnCoins
+
+    val totalUsd: Double
+        get() = ((usd1 * 1) + (usd5 * 5) + (usd10 * 10) +
+                (usd20 * 20) + (usd50 * 50) + (usd100 * 100)).toDouble()
+
+    val totalInMxn: Double
+        get() = totalMxn + (totalUsd * exchangeRate)
+}
+
+data class ActiveTandaInfoDto(
+    @SerializedName("participantId") val participantId: String,
+    @SerializedName("tandaId") val tandaId: String,
+    @SerializedName("tandaName") val tandaName: String,
+    @SerializedName("weeklyAmount") val weeklyAmount: Double,
+    @SerializedName("nextPendingWeek") val nextPendingWeek: Int,
+    @SerializedName("totalWeeks") val totalWeeks: Int,
+    @SerializedName("productName") val productName: String?,
+    @SerializedName("variant") val variant: String?
+)
+
+data class RouteSettlementOrderPaymentDto(
+    @SerializedName("deliveryId") val deliveryId: Int,
+    @SerializedName("orderId") val orderId: Int?,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("method") val method: String,
+    @SerializedName("notes") val notes: String?
+)
+
+data class RouteSettlementTandaPaymentDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName("tandaName") val tandaName: String?,
+    @SerializedName("weekNumber") val weekNumber: Int,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("method") val method: String,
+    @SerializedName("isExtraIncome") val isExtraIncome: Boolean,
+    @SerializedName("notes") val notes: String?
+)
+
+data class RouteSettlementDto(
+    @SerializedName("routeId") val routeId: Int,
+    @SerializedName("driverName") val driverName: String?,
+    @SerializedName("startedAt") val startedAt: String?,
+    @SerializedName("settledAt") val settledAt: String?,
+    @SerializedName("isSettled") val isSettled: Boolean,
+    @SerializedName("initialCash") val initialCash: Double,
+    @SerializedName("initialCashBreakdown") val initialCashBreakdown: CashDenominations?,
+    @SerializedName("initialExchangeRate") val initialExchangeRate: Double,
+    @SerializedName("totalOrdersCash") val totalOrdersCash: Double,
+    @SerializedName("totalOrdersTransfer") val totalOrdersTransfer: Double,
+    @SerializedName("totalOrdersCollected") val totalOrdersCollected: Double,
+    @SerializedName("totalTandasCash") val totalTandasCash: Double,
+    @SerializedName("totalTandasTransfer") val totalTandasTransfer: Double,
+    @SerializedName("totalTandasCollected") val totalTandasCollected: Double,
+    @SerializedName("totalExpenses") val totalExpenses: Double,
+    @SerializedName("expectedCashInHand") val expectedCashInHand: Double,
+    @SerializedName("actualCashInHand") val actualCashInHand: Double,
+    @SerializedName("difference") val difference: Double,
+    @SerializedName("finalCashBreakdown") val finalCashBreakdown: CashDenominations?,
+    @SerializedName("settlementNotes") val settlementNotes: String?,
+    @SerializedName("ordersDeliveredCount") val ordersDeliveredCount: Int,
+    @SerializedName("ordersTotalCount") val ordersTotalCount: Int,
+    @SerializedName("orderPayments") val orderPayments: List<RouteSettlementOrderPaymentDto> = emptyList(),
+    @SerializedName("tandaPayments") val tandaPayments: List<RouteSettlementTandaPaymentDto> = emptyList(),
+    @SerializedName("expenses") val expenses: List<DriverExpenseDto> = emptyList(),
+    @SerializedName("whatsAppShareText") val whatsAppShareText: String,
+    @SerializedName("webReportUrl") val webReportUrl: String
 )

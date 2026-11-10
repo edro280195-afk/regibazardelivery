@@ -40,6 +40,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
@@ -63,6 +66,8 @@ import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -116,7 +121,9 @@ import kotlinx.coroutines.launch
 
 private data class PaymentEntryUi(
     val amount: String,
-    val method: String
+    val method: String,
+    val cashReceived: String = "",
+    val notes: String = ""
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -138,6 +145,8 @@ fun DeliveryBottomSheetContent(
     onMarkInTransit: () -> Unit = {},
     onScanCompleted: () -> Unit = {},
     onExpense: () -> Unit = {},
+    onRecordTandaPayment: ((com.example.regibazarapp.data.models.DriverTandaPaymentRequest) -> Unit)? = null,
+    onDeliverWithoutPayment: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val palette = regiBazar2026Palette()
@@ -170,13 +179,26 @@ fun DeliveryBottomSheetContent(
     }
     var showScanner by remember(delivery.deliveryId) { mutableStateOf(false) }
     var detailsExpanded by remember(delivery.deliveryId) { mutableStateOf(false) }
+    var showTandaDialog by remember(delivery.deliveryId) { mutableStateOf(false) }
+    var selectedActiveTanda by remember(delivery.deliveryId) { mutableStateOf<com.example.regibazarapp.data.models.ActiveTandaInfoDto?>(null) }
+    var showUnpaidDeliveryDialog by remember(delivery.deliveryId) { mutableStateOf(false) }
+    var unpaidReasonText by remember(delivery.deliveryId) { mutableStateOf("") }
     val paymentSummary = remember(delivery) { driverPaymentSummary(delivery) }
     val parsedPayments = if (requiresPayment) {
         paymentEntries.mapNotNull { entry ->
             val amount = entry.amount.toDoubleOrNull() ?: return@mapNotNull null
-            amount.takeIf { it > 0 }?.let {
-                PaymentInputDto(amount = it, method = entry.method, notes = null)
+            val cashR = entry.cashReceived.toDoubleOrNull()
+            val change = if (cashR != null && entry.method == "Efectivo") (cashR - amount).coerceAtLeast(0.0) else null
+            val note = when {
+                cashR != null && change != null -> "RecibiÃ³: {cashR.toInt()} | Cambio: {change.toInt()}"
+                entry.notes.isNotBlank() -> entry.notes
+                else -> null
             }
+            amount.takeIf { it > 0 }?.let {
+                PaymentInputDto(amount = it, method = entry.method, notes = note)
+            }
+
+
         }
     } else {
         emptyList()
@@ -366,6 +388,63 @@ fun DeliveryBottomSheetContent(
                 )
             }
 
+            if (!delivery.activeTandas.isNullOrEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = palette.accentSoft.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("ðŸŒ¸", fontSize = 16.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "CLIENTA EN TANDA ACTIVA",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = palette.accent
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        for (tanda in delivery.activeTandas) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        tanda.tandaName,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = palette.textPrimary
+                                    )
+                                    Text(
+                                        "Semana / Â· Cuota: {tanda.weeklyPayment.toInt()}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = palette.textSecondary
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        selectedActiveTanda = tanda
+                                        showTandaDialog = true
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = palette.accent),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Abonar", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (requiresPayment) {
                 PaymentEditor(
                     entries = paymentEntries,
@@ -428,6 +507,36 @@ fun DeliveryBottomSheetContent(
                 palette = palette,
                 onDeliver = { onDeliver(parsedPayments) }
             )
+
+            if (requiresPayment && onDeliverWithoutPayment != null) {
+                OutlinedButton(
+                    onClick = {
+                        unpaidReasonText = ""
+                        showUnpaidDeliveryDialog = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFE11D48)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFFFDA4AF)),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFFE11D48)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "âš ï¸ Entregar sin recibir pago (Fiar)",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color(0xFFE11D48)
+                    )
+                }
+            }
 
             FlowRow(
                 modifier = Modifier
@@ -495,8 +604,73 @@ fun DeliveryBottomSheetContent(
             )
         }
     }
-}
+    if (showTandaDialog) {
+        DriverTandaDialog(
+            deliveryId = delivery.deliveryId,
+            clientName = delivery.clientName,
+            activeTandas = delivery.activeTandas,
+            initialSelectedTanda = selectedActiveTanda,
+            onDismiss = { showTandaDialog = false },
+            onConfirm = { req ->
+                showTandaDialog = false
+                onRecordTandaPayment?.invoke(req)
+            }
+        )
+    }
 
+    if (showUnpaidDeliveryDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnpaidDeliveryDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("âš ï¸", fontSize = 20.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Entregar sin recibir pago",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color(0xFF9F1239)
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Se registrarÃ¡ la entrega y se notificarÃ¡ inmediatamente a la dueÃ±a de Regi Bazar que el pedido queda con saldo pendiente.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = unpaidReasonText,
+                        onValueChange = { unpaidReasonText = it },
+                        label = { Text("Motivo / ObservaciÃ³n (Ej. Paga por transf. despuÃ©s)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = false,
+                        maxLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUnpaidDeliveryDialog = false
+                        onDeliverWithoutPayment?.invoke(unpaidReasonText.trim())
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Confirmar Entrega Sin Pago", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnpaidDeliveryDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+}
 @Composable
 private fun SheetGrip(palette: RegiBazar2026Palette) {
     Box(
@@ -900,9 +1074,135 @@ private fun PaymentEntry(
                 }
             }
         }
+        if (entry.method == "Efectivo") {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Â¿Con cuÃ¡nto paga la clienta?",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = palette.textSecondary
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(50, 100, 200, 500, 1000).forEach { denom ->
+                    Surface(
+                        onClick = { onEntryChange(entry.copy(cashReceived = denom.toString())) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (entry.cashReceived == denom.toString()) palette.accent else palette.surface,
+                        contentColor = if (entry.cashReceived == denom.toString()) Color.White else palette.accent,
+                        border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(30.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("$", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                Surface(
+                    onClick = { onEntryChange(entry.copy(cashReceived = entry.amount)) },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (entry.cashReceived == entry.amount && entry.amount.isNotBlank()) palette.accent else palette.surface,
+                    contentColor = if (entry.cashReceived == entry.amount && entry.amount.isNotBlank()) Color.White else palette.accent,
+                    border = BorderStroke(1.dp, palette.accent.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .height(30.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("Exacto", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            OutlinedTextField(
+                value = entry.cashReceived,
+                onValueChange = { value ->
+                    onEntryChange(entry.copy(cashReceived = value.filter { it.isDigit() || it == '.' }))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                prefix = { Text("$") },
+                label = { Text("Efectivo recibido de la clienta") },
+                placeholder = { Text("Ej. 500") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = palette.surface,
+                    unfocusedContainerColor = palette.surface,
+                    focusedBorderColor = palette.money,
+                    unfocusedBorderColor = palette.divider,
+                    focusedTextColor = palette.textPrimary,
+                    unfocusedTextColor = palette.textPrimary,
+                    cursorColor = palette.money
+                )
+            )
+
+            // Indicador de cambio destacado
+            val amountVal = entry.amount.toDoubleOrNull() ?: 0.0
+            val receivedVal = entry.cashReceived.toDoubleOrNull()
+            if (receivedVal != null && amountVal > 0) {
+                val change = receivedVal - amountVal
+                Spacer(Modifier.height(6.dp))
+                if (change >= 0) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFE8F5E9),
+                        border = BorderStroke(1.5.dp, Color(0xFF2E7D32)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("ðŸ’µ", fontSize = 22.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "DAR DE CAMBIO:",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 10.sp),
+                                    color = Color(0xFF1B5E20)
+                                )
+                                Text(
+                                    text = if (change == 0.0) "Cobro Exacto (Sin cambio)" else formatRouteMoney(change),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 18.sp
+                                    ),
+                                    color = Color(0xFF1B5E20)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFEBEE),
+                        border = BorderStroke(1.dp, Color(0xFFC62828)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("âš ï¸", fontSize = 16.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Faltan  para cubrir el monto",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color(0xFFC62828)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
-
 @Composable
 private fun DeliveryDetails(
     delivery: RouteDeliveryDto,

@@ -89,6 +89,7 @@ fun RouteScreen(
     var showSignatureDialog by remember { mutableStateOf(false) }
     var showRouteCompleteDialog by remember { mutableStateOf(false) }
     var showLoadScanner by remember { mutableStateOf(false) }
+    var showStartRouteFundDialog by remember { mutableStateOf(false) }
 
     // â•â•â• PERMISOS EN RUNTIME â•â•â•
     var locationPermissionGranted by remember { mutableStateOf(false) }
@@ -112,8 +113,7 @@ fun RouteScreen(
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (locationPermissionGranted) {
             // Arrancamos la ruta y el motor de inmediato
-            routeViewModel.startRoute()
-            LocationForegroundService.start(context, driverToken)
+            showStartRouteFundDialog = true
             
             // Pedimos permisos de background si es necesario
             if (!backgroundLocationGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -156,8 +156,7 @@ fun RouteScreen(
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             )
         } else {
-            routeViewModel.startRoute()
-            LocationForegroundService.start(context, driverToken)
+            showStartRouteFundDialog = true
         }
     }
 
@@ -316,6 +315,18 @@ fun RouteScreen(
                 onDismiss = { showReorderDialog = false }
             )
         }
+    }
+
+    if (showStartRouteFundDialog) {
+        com.example.regibazarapp.ui.components.StartRouteFundDialog(
+            initialExchangeRate = uiState.routeData?.dailyExchangeRate ?: 18.0,
+            onDismiss = { showStartRouteFundDialog = false },
+            onConfirmStart = { req ->
+                showStartRouteFundDialog = false
+                routeViewModel.startRoute(req)
+                LocationForegroundService.start(context, driverToken)
+            }
+        )
     }
 
     if (showExpenseDialog) {
@@ -664,7 +675,20 @@ fun RouteScreen(
                 }
             },
             onDismissOrderChanged = routeViewModel::dismissOrderChangedAlert,
-            onClearError = routeViewModel::clearError
+            onClearError = routeViewModel::clearError,
+            onRecordTandaPayment = { req ->
+                routeViewModel.recordTandaPayment(req) { success, msg ->
+                    if (success) {
+                        android.widget.Toast.makeText(context, "🌸 ¡Pago de tanda registrado con éxito!", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        android.widget.Toast.makeText(context, "Error al registrar tanda: ${msg ?: ""}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onDeliverWithoutPayment = { reason ->
+                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                routeViewModel.deliverCurrentWithoutPayment(reason)
+            }
         )
     } else {
     // â”€â”€ MAIN HUD ANTERIOR â”€â”€
@@ -698,7 +722,20 @@ fun RouteScreen(
                 hasSignature = uiState.capturedSignature != null,
                 isDelivering = uiState.isDelivering,
                 onMarkInTransit = { routeViewModel.markCurrentInTransit() },
-                onScanCompleted = { routeViewModel.loadRoute() }
+                onScanCompleted = { routeViewModel.loadRoute() },
+                onRecordTandaPayment = { req ->
+                    routeViewModel.recordTandaPayment(req) { success, msg ->
+                        if (success) {
+                            android.widget.Toast.makeText(context, "ðŸŒ¸ Â¡Pago de tanda registrado con Ã©xito!", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            android.widget.Toast.makeText(context, "Error al registrar tanda: ${msg ?: ""}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                onDeliverWithoutPayment = { reason ->
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    routeViewModel.deliverCurrentWithoutPayment(reason)
+                }
             )
         },
         containerColor = DarkBackground

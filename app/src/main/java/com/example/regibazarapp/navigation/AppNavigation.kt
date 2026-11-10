@@ -278,6 +278,12 @@ fun AppNavigation(
                     deliveries = uiState.deliveries,
                     fastestDoorTimeSecs = uiState.fastestDoorTimeSecs,
                     slowestDoorTimeSecs = uiState.slowestDoorTimeSecs,
+                    token = uiState.token,
+                    initialCash = uiState.initialCash,
+                    totalExpenses = uiState.totalExpenses,
+                    settlement = uiState.settlement,
+                    isSettling = uiState.isSettling,
+                    onSubmitSettlement = summaryViewModel::submitSettlement,
                     onFinish = {
                         navController.navigate(Routes.LOGIN) {
                             popUpTo(0) { inclusive = true }

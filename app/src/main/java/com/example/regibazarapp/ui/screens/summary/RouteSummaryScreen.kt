@@ -61,7 +61,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.regibazarapp.data.models.CashDenominations
 import com.example.regibazarapp.data.models.RouteDeliveryDto
+import com.example.regibazarapp.data.models.RouteSettlementDto
 import com.example.regibazarapp.ui.theme.RegiBazar2026Palette
 import com.example.regibazarapp.ui.theme.RegiBazar2026Tokens
 import com.example.regibazarapp.ui.theme.regiBazar2026Palette
@@ -82,6 +84,12 @@ fun RouteSummaryScreen(
     deliveries: List<RouteDeliveryDto> = emptyList(),
     fastestDoorTimeSecs: Long? = null,
     slowestDoorTimeSecs: Long? = null,
+    token: String = "",
+    initialCash: Double = 0.0,
+    totalExpenses: Double = 0.0,
+    settlement: RouteSettlementDto? = null,
+    isSettling: Boolean = false,
+    onSubmitSettlement: ((Double, CashDenominations, String?, (Boolean) -> Unit) -> Unit)? = null,
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
@@ -176,6 +184,19 @@ fun RouteSummaryScreen(
                     collectedByTransfer = collectedByTransfer,
                     collectedByDeposit = collectedByDeposit,
                     palette = palette
+                )
+            }
+
+            item(key = "summary-cash-settlement") {
+                RouteCashSettlementCard(
+                    token = token,
+                    initialCash = initialCash,
+                    collectedByCash = collectedByCash,
+                    totalExpenses = totalExpenses,
+                    settlement = settlement,
+                    isSettling = isSettling,
+                    palette = palette,
+                    onSubmitSettlement = onSubmitSettlement
                 )
             }
 

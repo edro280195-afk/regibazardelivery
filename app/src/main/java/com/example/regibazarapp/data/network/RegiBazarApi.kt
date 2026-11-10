@@ -26,7 +26,8 @@ interface RegiBazarApi {
     /** Iniciar la ruta */
     @POST("driver/{token}/start")
     suspend fun startRoute(
-        @Path("token") driverToken: String
+        @Path("token") driverToken: String,
+        @Body request: StartRouteRequest? = null
     ): Response<SimpleMessageResponse>
 
     // ─── GPS ───
@@ -67,6 +68,8 @@ interface RegiBazarApi {
         @Part("paymentsJson") paymentsJson: RequestBody?,
         @Part("signatureSvg") signatureSvg: RequestBody?,
         @Part("signedByName") signedByName: RequestBody?,
+        @Part("deliveredWithoutPayment") deliveredWithoutPayment: RequestBody? = null,
+        @Part("unpaidReason") unpaidReason: RequestBody? = null,
         @Part photos: List<MultipartBody.Part>?
     ): Response<SimpleMessageResponse>
 
@@ -118,6 +121,25 @@ interface RegiBazarApi {
         @Path("deliveryId") deliveryId: Int,
         @Body request: SendMessageRequest
     ): Response<ChatMessageDto>
+
+    // ─── TANDAS EN RUTA Y CORTE DE CAJA ───
+
+    @POST("driver/{token}/tanda-payment")
+    suspend fun recordTandaPayment(
+        @Path("token") driverToken: String,
+        @Body request: DriverTandaPaymentRequest
+    ): Response<SimpleMessageResponse>
+
+    @POST("driver/{token}/settle")
+    suspend fun settleRoute(
+        @Path("token") driverToken: String,
+        @Body request: RouteSettlementRequest
+    ): Response<RouteSettlementDto>
+
+    @GET("driver/{token}/settlement")
+    suspend fun getSettlement(
+        @Path("token") driverToken: String
+    ): Response<RouteSettlementDto>
 
     // ─── GASTOS ───
 

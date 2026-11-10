@@ -830,10 +830,10 @@ class RouteViewModel(application: Application) : AndroidViewModel(application) {
 
     // ─── ROUTE ACTIONS ───
 
-    fun startRoute() {
+    fun startRoute(request: StartRouteRequest? = null) {
         viewModelScope.launch {
             try {
-                val response = NetworkModule.api.startRoute(driverToken)
+                val response = NetworkModule.api.startRoute(driverToken, request)
                 if (response.isSuccessful) {
                     _uiState.update { it.copy(isLocationPaused = false) }
                     try {
@@ -849,6 +849,25 @@ class RouteViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Error iniciando ruta: ${e.localizedMessage}") }
+            }
+        }
+    }
+
+    fun recordTandaPayment(
+        request: DriverTandaPaymentRequest,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkModule.api.recordTandaPayment(driverToken, request)
+                if (response.isSuccessful) {
+                    loadRoute()
+                    onResult(true, null)
+                } else {
+                    onResult(false, "Error: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage)
             }
         }
     }
@@ -942,6 +961,54 @@ class RouteViewModel(application: Application) : AndroidViewModel(application) {
                 val paymentsJson = Gson().toJson(payments)
                 enqueueDeliveryOffline(delivery, paymentsJson, photo, signature)
                 _uiState.update { it.copy(isDelivering = false, capturedPhoto = null, capturedSignature = null, error = "Sin conexión. Acción guardada para cuando haya internet.") }
+            }
+        }
+    }
+
+    fun deliverCurrentWithoutPayment(reason: String) {
+        val delivery = _uiState.value.currentDelivery ?: return
+        val photo = _uiState.value.capturedPhoto
+        val signature = _uiState.value.capturedSignature
+        val idempotencyKey = _uiState.value.deliveryIdempotencyKey
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDelivering = true) }
+            try {
+                val textMediaType = "text/plain".toMediaTypeOrNull()
+                val photoParts = buildPhotoParts(photo) + buildSignatureParts(signature)
+
+                val response = NetworkModule.api.markDelivered(
+                    driverToken = driverToken,
+                    deliveryId = delivery.deliveryId,
+                    idempotencyKey = idempotencyKey,
+                    notes = (if (reason.isNotBlank()) "Entregado sin pago: $reason" else "Entregado sin recibir pago").toRequestBody(textMediaType),
+                    payments = "[]".toRequestBody(textMediaType),
+                    paymentsJson = "[]".toRequestBody(textMediaType),
+                    signatureSvg = signature?.svg?.toRequestBody(textMediaType),
+                    signedByName = signature?.signedByName?.toRequestBody(textMediaType),
+                    deliveredWithoutPayment = "true".toRequestBody(textMediaType),
+                    unpaidReason = (if (reason.isNotBlank()) reason else "Entregado sin recibir pago").toRequestBody(textMediaType),
+                    photos = photoParts.ifEmpty { null }
+                )
+
+                if (response.isSuccessful) {
+                    _uiState.update { it.copy(isDelivering = false, capturedPhoto = null, capturedSignature = null) }
+                    loadRoute()
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isDelivering = false,
+                            error = "No se pudo registrar la entrega sin pago (${response.code()})."
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isDelivering = false,
+                        error = "Error al entregar sin pago: ${e.message}"
+                    )
+                }
             }
         }
     }

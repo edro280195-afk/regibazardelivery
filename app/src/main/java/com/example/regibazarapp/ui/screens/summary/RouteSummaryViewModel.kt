@@ -5,8 +5,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.regibazarapp.data.local.RouteDatabase
 import com.example.regibazarapp.data.local.RouteEntity
+import com.example.regibazarapp.data.models.CashDenominations
 import com.example.regibazarapp.data.models.RouteDeliveryDto
 import com.example.regibazarapp.data.models.RouteResponse
+import com.example.regibazarapp.data.models.RouteSettlementDto
+import com.example.regibazarapp.data.models.RouteSettlementRequest
 import com.example.regibazarapp.data.network.NetworkModule
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +28,7 @@ import java.time.format.DateTimeParseException
 data class RouteSummaryUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
+    val token: String = "",
     val routeName: String = "",
     val deliveredCount: Int = 0,
     val failedCount: Int = 0,
@@ -36,7 +40,11 @@ data class RouteSummaryUiState(
     val startedAt: String? = null,
     val deliveries: List<RouteDeliveryDto> = emptyList(),
     val fastestDoorTimeSecs: Long? = null,
-    val slowestDoorTimeSecs: Long? = null
+    val slowestDoorTimeSecs: Long? = null,
+    val initialCash: Double = 0.0,
+    val totalExpenses: Double = 0.0,
+    val settlement: RouteSettlementDto? = null,
+    val isSettling: Boolean = false
 )
 
 class RouteSummaryViewModel(application: Application) : AndroidViewModel(application) {
@@ -49,12 +57,58 @@ class RouteSummaryViewModel(application: Application) : AndroidViewModel(applica
     fun initialize(token: String) {
         if (initializedToken == token) return
         initializedToken = token
+        _uiState.update { it.copy(token = token) }
         loadSummary(token)
+    }
+
+    fun reloadSettlement() {
+        val token = _uiState.value.token
+        if (token.isNotBlank()) {
+            viewModelScope.launch {
+                try {
+                    val sRes = NetworkModule.api.getSettlement(token)
+                    if (sRes.isSuccessful && sRes.body() != null) {
+                        _uiState.update { it.copy(settlement = sRes.body()) }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun submitSettlement(
+        finalCashActual: Double,
+        breakdown: CashDenominations,
+        notes: String?,
+        onDone: (Boolean) -> Unit
+    ) {
+        val token = _uiState.value.token
+        if (token.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSettling = true) }
+            try {
+                val req = RouteSettlementRequest(
+                    finalCashActual = finalCashActual,
+                    breakdown = breakdown,
+                    notes = notes
+                )
+                val res = NetworkModule.api.settleRoute(token, req)
+                if (res.isSuccessful && res.body() != null) {
+                    _uiState.update { it.copy(settlement = res.body(), isSettling = false) }
+                    onDone(true)
+                } else {
+                    _uiState.update { it.copy(isSettling = false) }
+                    onDone(false)
+                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isSettling = false) }
+                onDone(false)
+            }
+        }
     }
 
     private fun loadSummary(token: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, token = token) }
             try {
                 val response = NetworkModule.api.getRoute(token)
                 if (response.isSuccessful && response.body() != null) {
@@ -63,6 +117,13 @@ class RouteSummaryViewModel(application: Application) : AndroidViewModel(applica
                         routeDao.upsertRoute(RouteEntity(token = token, routeJson = gson.toJson(route)))
                     }
                     processRoute(route)
+                    // Intentar cargar la liquidación completa
+                    try {
+                        val sRes = NetworkModule.api.getSettlement(token)
+                        if (sRes.isSuccessful && sRes.body() != null) {
+                            _uiState.update { it.copy(settlement = sRes.body()) }
+                        }
+                    } catch (_: Exception) {}
                 } else {
                     loadCachedSummary(token, "No se pudo cargar el resumen (${response.code()}).")
                 }
@@ -135,7 +196,9 @@ class RouteSummaryViewModel(application: Application) : AndroidViewModel(applica
                 startedAt = route.startedAt,
                 deliveries = deliveries,
                 fastestDoorTimeSecs = doorTimeSecs.minOrNull(),
-                slowestDoorTimeSecs = doorTimeSecs.maxOrNull()
+                slowestDoorTimeSecs = doorTimeSecs.maxOrNull(),
+                initialCash = route.initialCash ?: 0.0,
+                totalExpenses = route.expenses.sumOf { it.amount }
             )
         }
     }

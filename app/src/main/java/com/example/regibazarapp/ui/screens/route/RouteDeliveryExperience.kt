@@ -115,7 +115,9 @@ fun RouteDeliveryExperience(
     onToggleCami: () -> Unit,
     onCenterMap: () -> Unit,
     onDismissOrderChanged: () -> Unit,
-    onClearError: () -> Unit
+    onClearError: () -> Unit,
+    onRecordTandaPayment: ((com.example.regibazarapp.data.models.DriverTandaPaymentRequest) -> Unit)? = null,
+    onDeliverWithoutPayment: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val palette = regiBazar2026Palette()
@@ -151,7 +153,9 @@ fun RouteDeliveryExperience(
                 isDelivering = uiState.isDelivering,
                 onMarkInTransit = onMarkInTransit,
                 onScanCompleted = onScanCompleted,
-                onExpense = onExpense
+                onExpense = onExpense,
+                onRecordTandaPayment = onRecordTandaPayment,
+                onDeliverWithoutPayment = onDeliverWithoutPayment
             )
         },
         containerColor = palette.background

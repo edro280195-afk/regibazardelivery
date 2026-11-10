@@ -99,3 +99,28 @@ data class AiRouteSelectionRequest(
     @SerializedName("voiceCommand") val voiceCommand: String,
     @SerializedName("availableOrders") val availableOrders: List<OrderSummaryDto>
 )
+
+// ── Solicitudes de caja chica, tandas en ruta y corte de caja ──
+data class StartRouteRequest(
+    @SerializedName("initialCash") val initialCash: Double = 0.0,
+    @SerializedName("exchangeRate") val exchangeRate: Double = 18.0,
+    @SerializedName("breakdown") val breakdown: CashDenominations? = null
+)
+
+data class DriverTandaPaymentRequest(
+    @SerializedName("deliveryId") val deliveryId: Int? = null,
+    @SerializedName("tandaParticipantId") val tandaParticipantId: String? = null,
+    @SerializedName("clientName") val clientName: String,
+    @SerializedName("weekNumber") val weekNumber: Int = 1,
+    @SerializedName("amount") val amount: Double,
+    @SerializedName("paymentMethod") val paymentMethod: String = "Efectivo",
+    @SerializedName("notes") val notes: String? = null,
+    @SerializedName("cashReceived") val cashReceived: Double? = null,
+    @SerializedName("cashChange") val cashChange: Double? = null
+)
+
+data class RouteSettlementRequest(
+    @SerializedName("finalCashActual") val finalCashActual: Double,
+    @SerializedName("breakdown") val breakdown: CashDenominations? = null,
+    @SerializedName("notes") val notes: String? = null
+)
